@@ -20,4 +20,3 @@ public class MainTest {
     }
 }
 
-// VY NGUUUUU
