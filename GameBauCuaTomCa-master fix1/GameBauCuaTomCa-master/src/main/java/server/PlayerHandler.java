@@ -58,6 +58,7 @@ public class PlayerHandler implements Runnable {
                     if (jsonMsg.has("id")) userId = jsonMsg.get("id").getAsInt();
                     if (jsonMsg.has("name")) playerName = jsonMsg.get("name").getAsString();
                     if (jsonMsg.has("avatar")) avatarNum = jsonMsg.get("avatar").getAsInt();
+                    if (jsonMsg.has("balance")) balance = jsonMsg.get("balance").getAsDouble(); // VAILON SO DU 100000
                     // KHÔNG GÁN balance từ client, chỉ lấy từ DB hoặc giữ nguyên trên server!
 
                     GameRoom room = ServerMain.roomManager.joinAnyRoom(this);
