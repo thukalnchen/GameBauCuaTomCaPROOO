@@ -36,7 +36,16 @@ public class GameClientConnection {
         }
     }
 
+
     public void close() throws IOException {
         socket.close();
     }
+    public void disconnect() {
+        try {
+            if (socket != null && !socket.isClosed()) socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 }

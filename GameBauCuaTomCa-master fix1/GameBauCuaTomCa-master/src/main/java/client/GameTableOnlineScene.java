@@ -193,13 +193,22 @@ public class GameTableOnlineScene implements MessageListener {
 
         Button exitBtn = createStyledButton("🚪 Thoát", "#ff9ff3", "#f368e0", 180, 40);
         exitBtn.setOnAction(e -> {
-            // Gửi thông báo lên server báo muốn rời bàn
+            // Gửi LEAVE_TABLE lên server trước (tùy ý)
             JsonObject msg = new JsonObject();
             msg.addProperty("action", "LEAVE_TABLE");
-            sendToServer(msg.toString());  // Giả sử bạn đã có hàm này (hoặc out.println(...))
-            // Sau đó chuyển về giao diện Profile
+            connection.send(msg.toString());
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
+            // Đóng kết nối khỏi server
+            connection.disconnect(); // Hoặc connection.close();
+
+            // Chuyển về giao diện khác
             ProfileScene.showProfile(stage, user);
         });
+
 
 
 
@@ -285,7 +294,7 @@ public class GameTableOnlineScene implements MessageListener {
 
     @Override
     public void onDisconnect(Exception e) {
-        Platform.runLater(() -> showAlert("Mất kết nối đến server!"));
+        Platform.runLater(() -> showAlert("Bạn đã thoát khỏi bàn thành công"));
     }
 
     private void handleServerMessage(String message) {
