@@ -86,9 +86,11 @@ public class PlayerHandler implements Runnable {
                 } else if (action.equals("LEAVE_TABLE")) {
                     if (currentRoom != null) {
                         currentRoom.removePlayerByUserId(this.userId);
-                        currentRoom = null;
+                        setRoom(null); // Dùng hàm setRoom
+                        System.out.println("[INFO] Player " + this.userId + " has left the table.");
                     }
                 }
+
 
 
             }
