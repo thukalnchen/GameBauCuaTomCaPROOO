@@ -31,6 +31,7 @@ public class GameTableScene {
     private AudioClip shakeSound;
     private AudioClip winSound;
     private AudioClip loseSound;
+    private AudioClip backsound;
 
     private final String[] symbolImg = {
             "/symbols/nai.png", "/symbols/bau.png", "/symbols/ga.png",
@@ -244,11 +245,14 @@ public class GameTableScene {
         Pane particlePane = new Pane();
         createFloatingParticles(particlePane);
 
-        // Load sounds
+        // Load s
         try {
             shakeSound = new AudioClip(getClass().getResource("/sounds/shake.wav").toExternalForm());
             winSound = new AudioClip(getClass().getResource("/sounds/win.wav").toExternalForm());
             loseSound = new AudioClip(getClass().getResource("/sounds/lose.wav").toExternalForm());
+            backsound = new AudioClip(getClass().getResource("/sounds/back.wav").toExternalForm());
+            backsound.setCycleCount(AudioClip.INDEFINITE); // 🔁 Phát lặp vô hạn
+
         } catch (Exception e) {
             System.out.println("Could not load sound files");
         }
@@ -377,8 +381,10 @@ public class GameTableScene {
         Button exitBtn = createStyledButton("⛔ THOÁT", "#bdc3c7", "#2c3e50", 120, 35);
         exitBtn.setOnAction(e -> {
             if (backgroundAnimation != null) backgroundAnimation.stop();
+            if (backsound != null) backsound.stop(); // ⏹ Dừng nhạc nền khi rời phòng
             ProfileScene.showProfile(mainStage, user);
         });
+
 
 
 
@@ -581,6 +587,8 @@ public class GameTableScene {
         stage.setTitle("🎲 Bầu Cua - Bàn Chơi 4 Góc");
         stage.setScene(scene);
         stage.show();
+        backsound.play(); // ▶ Bắt đầu phát nhạc nền
+
     }
 
     private void showMessage(Label msg, String text, String color) {

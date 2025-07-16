@@ -1,5 +1,4 @@
 package client;
-
 import common.User;
 import javafx.animation.*;
 import javafx.application.Platform;
@@ -15,18 +14,16 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.Stop;
-import javafx.scene.shape.Circle;
+import javafx.scene.shape.*;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-
 import java.io.InputStream;
 import java.io.IOException;
 import java.util.*;
 import com.google.gson.*;
-
-import javafx.scene.shape.Rectangle;
 import javafx.scene.effect.DropShadow;
-
+import javafx.scene.effect.GaussianBlur;
+import javafx.scene.effect.Glow;
 import static java.lang.System.out;
 
 public class GameTableOnlineScene implements MessageListener {
@@ -35,25 +32,21 @@ public class GameTableOnlineScene implements MessageListener {
             "/symbols/nai.png", "/symbols/bau.png", "/symbols/ga.png",
             "/symbols/ca.png", "/symbols/cua.png", "/symbols/tom.png"
     };
-
     private User user;
     private GameClientConnection connection;
-
     private int[] betAmount = new int[6];
     private TextField[] betFields = new TextField[6];
     private VBox[] playerBoxes = new VBox[4];
     private Label[] playerNameLabels = new Label[4];
     private Label[] playerBalanceLabels = new Label[4];
     private ImageView[] playerAvatarViews = new ImageView[4];
-
     private ImageView[] symbolsImageViews = new ImageView[6];
     private AudioClip shakeSound;
     private AudioClip winSound;
     private AudioClip loseSound;
-
+    private AudioClip backSound;
     private HBox diceBox = new HBox(15);
     private Label resultLabel = new Label();
-
     private List<Map<String, Object>> playersInRoom = new ArrayList<>();
 
     public GameTableOnlineScene(User user) {
@@ -97,59 +90,107 @@ public class GameTableOnlineScene implements MessageListener {
         shakeSound = new AudioClip(getClass().getResource("/sounds/shake.wav").toExternalForm());
         winSound = new AudioClip(getClass().getResource("/sounds/win.wav").toExternalForm());
         loseSound = new AudioClip(getClass().getResource("/sounds/lose.wav").toExternalForm());
+        backSound = new AudioClip(getClass().getResource("/sounds/back.wav").toExternalForm());
+        backSound.setCycleCount(AudioClip.INDEFINITE);
 
+        // Tạo background với nhiều lớp gradient động
         Rectangle bgRect = new Rectangle(1600, 800);
+
+        // Gradient 1 - Màu xanh dương đậm
         LinearGradient gradient1 = new LinearGradient(0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
                 new Stop(0, Color.web("#0f4c75")),
-                new Stop(0.3, Color.web("#3282b8")),
-                new Stop(0.7, Color.web("#bbe1fa")),
-                new Stop(1, Color.web("#1e3c72")));
+                new Stop(0.2, Color.web("#3282b8")),
+                new Stop(0.4, Color.web("#bbe1fa")),
+                new Stop(0.6, Color.web("#1e3c72")),
+                new Stop(0.8, Color.web("#2a5298")),
+                new Stop(1, Color.web("#0f4c75")));
+
+        // Gradient 2 - Màu tím hồng
         LinearGradient gradient2 = new LinearGradient(0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
                 new Stop(0, Color.web("#667eea")),
-                new Stop(0.3, Color.web("#764ba2")),
-                new Stop(0.7, Color.web("#f093fb")),
-                new Stop(1, Color.web("#f5576c")));
+                new Stop(0.2, Color.web("#764ba2")),
+                new Stop(0.4, Color.web("#f093fb")),
+                new Stop(0.6, Color.web("#f5576c")),
+                new Stop(0.8, Color.web("#4facfe")),
+                new Stop(1, Color.web("#00f2fe")));
+
+        // Gradient 3 - Màu vàng cam
+        LinearGradient gradient3 = new LinearGradient(0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#ff9a9e")),
+                new Stop(0.2, Color.web("#fecfef")),
+                new Stop(0.4, Color.web("#fecfef")),
+                new Stop(0.6, Color.web("#ff9a9e")),
+                new Stop(0.8, Color.web("#a8edea")),
+                new Stop(1, Color.web("#fed6e3")));
+
         bgRect.setFill(gradient1);
 
+        // Animation chuyển đổi gradient phức tạp hơn
         Timeline backgroundAnimation = new Timeline(
                 new KeyFrame(Duration.ZERO, new KeyValue(bgRect.fillProperty(), gradient1)),
-                new KeyFrame(Duration.seconds(8), new KeyValue(bgRect.fillProperty(), gradient2)),
-                new KeyFrame(Duration.seconds(16), new KeyValue(bgRect.fillProperty(), gradient1))
+                new KeyFrame(Duration.seconds(6), new KeyValue(bgRect.fillProperty(), gradient2)),
+                new KeyFrame(Duration.seconds(12), new KeyValue(bgRect.fillProperty(), gradient3)),
+                new KeyFrame(Duration.seconds(18), new KeyValue(bgRect.fillProperty(), gradient1))
         );
         backgroundAnimation.setCycleCount(Timeline.INDEFINITE);
         backgroundAnimation.play();
 
-        Pane particlePane = new Pane();
-        createFloatingParticles(particlePane);
+        // Tạo pane cho các hiệu ứng nền
+        Pane effectPane = new Pane();
+        createFloatingSymbols(effectPane);
+        createFloatingParticles(effectPane);
+        createPulsingCircles(effectPane);
 
         Label gameTitle = new Label("🎲 BẦU CUA TÔM CÁ 🎲");
-        gameTitle.setStyle("-fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: white;");
-        gameTitle.setEffect(new DropShadow(15, Color.web("#FFD700", 0.7)));
+        gameTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: white;");
+
+        // Hiệu ứng glow cho title
+        DropShadow titleGlow = new DropShadow(20, Color.web("#FFD700", 0.8));
+        titleGlow.setInput(new Glow(0.5));
+        gameTitle.setEffect(titleGlow);
+
+        // Animation cho title
+        ScaleTransition titleScale = new ScaleTransition(Duration.seconds(2), gameTitle);
+        titleScale.setFromX(1.0);
+        titleScale.setFromY(1.0);
+        titleScale.setToX(1.05);
+        titleScale.setToY(1.05);
+        titleScale.setCycleCount(Timeline.INDEFINITE);
+        titleScale.setAutoReverse(true);
+        titleScale.play();
 
         GridPane symbolsGrid = new GridPane();
         symbolsGrid.setAlignment(Pos.CENTER);
         symbolsGrid.setHgap(15);
         symbolsGrid.setVgap(15);
         symbolsGrid.setPadding(new Insets(15));
-        symbolsGrid.setStyle("-fx-background-color: rgba(255,255,255,0.1); -fx-background-radius: 20px; -fx-border-color: rgba(255,255,255,0.3); -fx-border-width: 2px; -fx-border-radius: 20px;");
+        symbolsGrid.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-background-radius: 25px; -fx-border-color: rgba(255,255,255,0.4); -fx-border-width: 2px; -fx-border-radius: 25px;");
+
+        // Hiệu ứng glow cho grid
+        DropShadow gridGlow = new DropShadow(15, Color.web("#00FFFF", 0.3));
+        symbolsGrid.setEffect(gridGlow);
 
         for (int i = 0; i < 6; i++) {
             VBox symbolCol = new VBox(6);
             symbolCol.setAlignment(Pos.CENTER);
             symbolCol.setPrefWidth(100);
             symbolCol.setPrefHeight(140);
-            symbolCol.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-background-radius: 15px; -fx-border-color: rgba(255,255,255,0.4); -fx-border-width: 1px; -fx-border-radius: 15px;");
+            symbolCol.setStyle("-fx-background-color: rgba(255,255,255,0.2); -fx-background-radius: 18px; -fx-border-color: rgba(255,255,255,0.5); -fx-border-width: 1px; -fx-border-radius: 18px;");
 
             int idx = i;
             symbolCol.setOnMouseEntered(e -> {
-                ScaleTransition scale = new ScaleTransition(Duration.millis(150), symbolCol);
-                scale.setToX(1.03);
-                scale.setToY(1.03);
+                ScaleTransition scale = new ScaleTransition(Duration.millis(200), symbolCol);
+                scale.setToX(1.08);
+                scale.setToY(1.08);
                 scale.play();
-                symbolCol.setEffect(new DropShadow(10, Color.web("#FFD700", 0.6)));
+
+                DropShadow hoverGlow = new DropShadow(15, Color.web("#FFD700", 0.8));
+                hoverGlow.setInput(new Glow(0.7));
+                symbolCol.setEffect(hoverGlow);
             });
+
             symbolCol.setOnMouseExited(e -> {
-                ScaleTransition scale = new ScaleTransition(Duration.millis(150), symbolCol);
+                ScaleTransition scale = new ScaleTransition(Duration.millis(200), symbolCol);
                 scale.setToX(1);
                 scale.setToY(1);
                 scale.play();
@@ -158,15 +199,24 @@ public class GameTableOnlineScene implements MessageListener {
 
             ImageView img = new ImageView(new Image(getClass().getResourceAsStream(symbolImg[i]), 60, 60, true, true));
             symbolsImageViews[i] = img;
-            img.setEffect(new DropShadow(8, Color.web("#ffffff", 0.5)));
+
+            // Hiệu ứng xoay nhẹ cho symbol
+            RotateTransition rotate = new RotateTransition(Duration.seconds(8 + i), img);
+            rotate.setByAngle(360);
+            rotate.setCycleCount(Timeline.INDEFINITE);
+            rotate.play();
+
+            DropShadow imgShadow = new DropShadow(10, Color.web("#ffffff", 0.6));
+            img.setEffect(imgShadow);
 
             Label lbl = new Label(symbolNames[i]);
-            lbl.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: white;");
+            lbl.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: white;");
 
             TextField betField = new TextField("0");
             betField.setMaxWidth(60);
             betField.setPrefHeight(28);
-            betField.setStyle("-fx-background-color: rgba(255,255,255,0.9); -fx-background-radius: 12px; -fx-border-color: #3498db; -fx-border-width: 1px; -fx-border-radius: 12px; -fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-alignment: center;");
+            betField.setStyle("-fx-background-color: rgba(255,255,255,0.95); -fx-background-radius: 15px; -fx-border-color: #3498db; -fx-border-width: 2px; -fx-border-radius: 15px; -fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-alignment: center;");
+
             betField.textProperty().addListener((obs, oldV, newV) -> {
                 try {
                     betAmount[idx] = Integer.parseInt(newV.isEmpty() ? "0" : newV);
@@ -175,8 +225,8 @@ public class GameTableOnlineScene implements MessageListener {
                 }
             });
             betFields[i] = betField;
-            symbolCol.getChildren().addAll(img, lbl, betField);
 
+            symbolCol.getChildren().addAll(img, lbl, betField);
             int row = i < 3 ? 0 : 1;
             int col = i < 3 ? i : i - 3;
             symbolsGrid.add(symbolCol, col, row);
@@ -185,15 +235,18 @@ public class GameTableOnlineScene implements MessageListener {
         Button betBtn = createStyledButton("🎯 ĐẶT CƯỢC", "#e74c3c", "#c0392b", 160, 40);
         betBtn.setOnAction(e -> sendBetToServer());
 
-        resultLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 10px 15px; -fx-background-color: rgba(0,0,0,0.5); -fx-background-radius: 15px;");
+        resultLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 12px 18px; -fx-background-color: rgba(0,0,0,0.6); -fx-background-radius: 18px; -fx-border-color: rgba(255,255,255,0.3); -fx-border-width: 1px; -fx-border-radius: 18px;");
 
         diceBox.setAlignment(Pos.CENTER);
-        diceBox.setPadding(new Insets(10));
-        diceBox.setStyle("-fx-background-color: rgba(255,255,255,0.2); -fx-background-radius: 20px; -fx-border-color: rgba(255,255,255,0.4); -fx-border-width: 2px; -fx-border-radius: 20px;");
+        diceBox.setPadding(new Insets(15));
+        diceBox.setStyle("-fx-background-color: rgba(255,255,255,0.25); -fx-background-radius: 25px; -fx-border-color: rgba(255,255,255,0.5); -fx-border-width: 2px; -fx-border-radius: 25px;");
+
+        // Hiệu ứng glow cho dice box
+        DropShadow diceGlow = new DropShadow(12, Color.web("#FF6B6B", 0.4));
+        diceBox.setEffect(diceGlow);
 
         Button exitBtn = createStyledButton("🚪 Thoát", "#ff9ff3", "#f368e0", 180, 40);
         exitBtn.setOnAction(e -> {
-            // Gửi LEAVE_TABLE lên server trước (tùy ý)
             JsonObject msg = new JsonObject();
             msg.addProperty("action", "LEAVE_TABLE");
             connection.send(msg.toString());
@@ -202,19 +255,13 @@ public class GameTableOnlineScene implements MessageListener {
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
             }
-            // Đóng kết nối khỏi server
-            connection.disconnect(); // Hoặc connection.close();
-
-            // Chuyển về giao diện khác
+            connection.disconnect();
             ProfileScene.showProfile(stage, user);
         });
 
-
-
-
-        VBox centerBox = new VBox(5, gameTitle, symbolsGrid, betBtn, diceBox, resultLabel, exitBtn);
+        VBox centerBox = new VBox(8, gameTitle, symbolsGrid, betBtn, diceBox, resultLabel, exitBtn);
         centerBox.setAlignment(Pos.CENTER);
-        centerBox.setPadding(new Insets(10));
+        centerBox.setPadding(new Insets(15));
 
         for (int i = 0; i < 4; i++) {
             playerNameLabels[i] = new Label();
@@ -222,7 +269,11 @@ public class GameTableOnlineScene implements MessageListener {
             playerAvatarViews[i] = new ImageView();
             playerBoxes[i] = new VBox(5, playerAvatarViews[i], playerNameLabels[i], playerBalanceLabels[i]);
             playerBoxes[i].setAlignment(Pos.CENTER);
-            playerBoxes[i].setStyle("-fx-padding: 6px; -fx-background-color: rgba(255,255,255,0.12); -fx-background-radius: 12px; -fx-border-color: white; -fx-border-width: 1px; -fx-border-radius: 12px;");
+            playerBoxes[i].setStyle("-fx-padding: 8px; -fx-background-color: rgba(255,255,255,0.18); -fx-background-radius: 15px; -fx-border-color: rgba(255,255,255,0.6); -fx-border-width: 1px; -fx-border-radius: 15px;");
+
+            // Hiệu ứng glow nhẹ cho player boxes
+            DropShadow playerGlow = new DropShadow(8, Color.web("#4ECDC4", 0.3));
+            playerBoxes[i].setEffect(playerGlow);
         }
 
         BorderPane gameLayout = new BorderPane();
@@ -233,7 +284,7 @@ public class GameTableOnlineScene implements MessageListener {
         gameLayout.setCenter(centerBox);
 
         StackPane root = new StackPane();
-        root.getChildren().addAll(bgRect, particlePane, gameLayout);
+        root.getChildren().addAll(bgRect, effectPane, gameLayout);
 
         Scene scene = new Scene(root, 1200, 800);
         stage.setTitle("🎲 Bầu Cua - Bàn Online");
@@ -241,38 +292,141 @@ public class GameTableOnlineScene implements MessageListener {
         stage.show();
 
         sendJoinTable();
+        backSound.play();
     }
 
     private Button createStyledButton(String text, String color1, String color2, double width, double height) {
         Button button = new Button(text);
         button.setPrefWidth(width);
         button.setPrefHeight(height);
-        button.setStyle("-fx-background-color: linear-gradient(to right, " + color1 + ", " + color2 + "); -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-background-radius: 20px; -fx-cursor: hand; -fx-border-color: rgba(255,255,255,0.3); -fx-border-width: 1px; -fx-border-radius: 20px;");
-        DropShadow glow = new DropShadow();
-        glow.setColor(Color.web(color1, 0.5));
-        glow.setRadius(10);
+        button.setStyle("-fx-background-color: linear-gradient(to right, " + color1 + ", " + color2 + "); -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-background-radius: 22px; -fx-cursor: hand; -fx-border-color: rgba(255,255,255,0.4); -fx-border-width: 1px; -fx-border-radius: 22px;");
+
+        DropShadow glow = new DropShadow(12, Color.web(color1, 0.6));
         button.setEffect(glow);
+
+        // Hiệu ứng hover cho button
+        button.setOnMouseEntered(e -> {
+            ScaleTransition scale = new ScaleTransition(Duration.millis(150), button);
+            scale.setToX(1.05);
+            scale.setToY(1.05);
+            scale.play();
+
+            DropShadow hoverGlow = new DropShadow(15, Color.web(color1, 0.8));
+            hoverGlow.setInput(new Glow(0.3));
+            button.setEffect(hoverGlow);
+        });
+
+        button.setOnMouseExited(e -> {
+            ScaleTransition scale = new ScaleTransition(Duration.millis(150), button);
+            scale.setToX(1.0);
+            scale.setToY(1.0);
+            scale.play();
+            button.setEffect(glow);
+        });
+
         return button;
     }
 
+    // Tạo các biểu tượng bầu cua bay qua bay lại
+    private void createFloatingSymbols(Pane pane) {
+        Random random = new Random();
+
+        for (int i = 0; i < 12; i++) {
+            int symbolIndex = random.nextInt(6);
+            ImageView floatingSymbol = new ImageView(new Image(getClass().getResourceAsStream(symbolImg[symbolIndex]), 40, 40, true, true));
+
+            floatingSymbol.setOpacity(0.15 + random.nextDouble() * 0.25);
+            floatingSymbol.setLayoutX(random.nextDouble() * 1200);
+            floatingSymbol.setLayoutY(random.nextDouble() * 800);
+
+            // Hiệu ứng di chuyển ngang
+            TranslateTransition moveX = new TranslateTransition(Duration.seconds(15 + random.nextDouble() * 20), floatingSymbol);
+            moveX.setFromX(-100);
+            moveX.setToX(1300);
+            moveX.setCycleCount(Timeline.INDEFINITE);
+            moveX.play();
+
+            // Hiệu ứng di chuyển dọc (lên xuống)
+            TranslateTransition moveY = new TranslateTransition(Duration.seconds(8 + random.nextDouble() * 12), floatingSymbol);
+            moveY.setByY(random.nextDouble() * 200 - 100);
+            moveY.setCycleCount(Timeline.INDEFINITE);
+            moveY.setAutoReverse(true);
+            moveY.play();
+
+            // Hiệu ứng xoay
+            RotateTransition rotate = new RotateTransition(Duration.seconds(10 + random.nextDouble() * 15), floatingSymbol);
+            rotate.setByAngle(360);
+            rotate.setCycleCount(Timeline.INDEFINITE);
+            rotate.play();
+
+            // Hiệu ứng fade
+            FadeTransition fade = new FadeTransition(Duration.seconds(3 + random.nextDouble() * 4), floatingSymbol);
+            fade.setFromValue(0.1);
+            fade.setToValue(0.4);
+            fade.setCycleCount(Timeline.INDEFINITE);
+            fade.setAutoReverse(true);
+            fade.play();
+
+            // Hiệu ứng scale
+            ScaleTransition scale = new ScaleTransition(Duration.seconds(6 + random.nextDouble() * 8), floatingSymbol);
+            scale.setFromX(0.8);
+            scale.setFromY(0.8);
+            scale.setToX(1.2);
+            scale.setToY(1.2);
+            scale.setCycleCount(Timeline.INDEFINITE);
+            scale.setAutoReverse(true);
+            scale.play();
+
+            pane.getChildren().add(floatingSymbol);
+        }
+    }
+
+    // Tạo các hạt sáng bay
     private void createFloatingParticles(Pane pane) {
         Random random = new Random();
-        for (int i = 0; i < 20; i++) {
-            Circle particle = new Circle(random.nextDouble() * 2 + 1);
-            particle.setFill(Color.web("#FFD700", random.nextDouble() * 0.5 + 0.2));
+
+        for (int i = 0; i < 30; i++) {
+            Circle particle = new Circle(random.nextDouble() * 3 + 1);
+
+            // Màu sắc đa dạng
+            Color[] colors = {
+                    Color.web("#FFD700"), Color.web("#FF6B6B"), Color.web("#4ECDC4"),
+                    Color.web("#45B7D1"), Color.web("#96CEB4"), Color.web("#FFEAA7"),
+                    Color.web("#DDA0DD"), Color.web("#98D8C8")
+            };
+
+            particle.setFill(colors[random.nextInt(colors.length)].deriveColor(0, 1, 1, random.nextDouble() * 0.6 + 0.2));
             particle.setLayoutX(random.nextDouble() * 1200);
             particle.setLayoutY(random.nextDouble() * 800);
 
-            TranslateTransition move = new TranslateTransition(Duration.seconds(random.nextDouble() * 25 + 20), particle);
-            move.setByX(random.nextDouble() * 300 - 150);
-            move.setByY(random.nextDouble() * 300 - 150);
-            move.setCycleCount(Timeline.INDEFINITE);
-            move.setAutoReverse(true);
-            move.play();
+            // Di chuyển theo đường cong
+            Path path = new Path();
+            MoveTo moveTo = new MoveTo();
+            moveTo.setX(random.nextDouble() * 1200);
+            moveTo.setY(random.nextDouble() * 800);
 
-            FadeTransition fade = new FadeTransition(Duration.seconds(random.nextDouble() * 5 + 4), particle);
+            CubicCurveTo curveTo = new CubicCurveTo();
+            curveTo.setControlX1(random.nextDouble() * 1200);
+            curveTo.setControlY1(random.nextDouble() * 800);
+            curveTo.setControlX2(random.nextDouble() * 1200);
+            curveTo.setControlY2(random.nextDouble() * 800);
+            curveTo.setX(random.nextDouble() * 1200);
+            curveTo.setY(random.nextDouble() * 800);
+
+            path.getElements().add(moveTo);
+            path.getElements().add(curveTo);
+
+            PathTransition pathTransition = new PathTransition();
+            pathTransition.setDuration(Duration.seconds(20 + random.nextDouble() * 30));
+            pathTransition.setPath(path);
+            pathTransition.setNode(particle);
+            pathTransition.setCycleCount(Timeline.INDEFINITE);
+            pathTransition.play();
+
+            // Hiệu ứng fade
+            FadeTransition fade = new FadeTransition(Duration.seconds(2 + random.nextDouble() * 4), particle);
             fade.setFromValue(0.1);
-            fade.setToValue(0.6);
+            fade.setToValue(0.8);
             fade.setCycleCount(Timeline.INDEFINITE);
             fade.setAutoReverse(true);
             fade.play();
@@ -280,13 +434,54 @@ public class GameTableOnlineScene implements MessageListener {
             pane.getChildren().add(particle);
         }
     }
+
+    // Tạo các vòng tròn phát sáng
+    private void createPulsingCircles(Pane pane) {
+        Random random = new Random();
+
+        for (int i = 0; i < 8; i++) {
+            Circle circle = new Circle(random.nextDouble() * 50 + 20);
+            circle.setFill(Color.TRANSPARENT);
+            circle.setStroke(Color.web("#FFD700", 0.3));
+            circle.setStrokeWidth(2);
+            circle.setLayoutX(random.nextDouble() * 1200);
+            circle.setLayoutY(random.nextDouble() * 800);
+
+            // Hiệu ứng phóng to thu nhỏ
+            ScaleTransition scale = new ScaleTransition(Duration.seconds(4 + random.nextDouble() * 6), circle);
+            scale.setFromX(0.5);
+            scale.setFromY(0.5);
+            scale.setToX(2.0);
+            scale.setToY(2.0);
+            scale.setCycleCount(Timeline.INDEFINITE);
+            scale.setAutoReverse(true);
+            scale.play();
+
+            // Hiệu ứng fade
+            FadeTransition fade = new FadeTransition(Duration.seconds(3 + random.nextDouble() * 4), circle);
+            fade.setFromValue(0.1);
+            fade.setToValue(0.5);
+            fade.setCycleCount(Timeline.INDEFINITE);
+            fade.setAutoReverse(true);
+            fade.play();
+
+            // Di chuyển chậm
+            TranslateTransition move = new TranslateTransition(Duration.seconds(25 + random.nextDouble() * 35), circle);
+            move.setByX(random.nextDouble() * 400 - 200);
+            move.setByY(random.nextDouble() * 400 - 200);
+            move.setCycleCount(Timeline.INDEFINITE);
+            move.setAutoReverse(true);
+            move.play();
+
+            pane.getChildren().add(circle);
+        }
+    }
+
     public void sendToServer(String message) {
         out.println(message);
         out.flush();
     }
 
-
-    // Xử lý message server trả về (được gọi từ thread mạng, luôn dùng Platform.runLater nếu cập nhật UI)
     @Override
     public void onServerMessage(String message) {
         Platform.runLater(() -> handleServerMessage(message));
@@ -298,15 +493,14 @@ public class GameTableOnlineScene implements MessageListener {
     }
 
     private void handleServerMessage(String message) {
-        // In ra log để debug mọi message từ server gửi về
         out.println("Message from server: [" + message + "]");
-        // Kiểm tra message có phải là JSON object không trước khi parse
+
         if (message != null && message.trim().startsWith("{")) {
             JsonObject obj = new Gson().fromJson(message, JsonObject.class);
             String action = obj.get("action").getAsString();
+
             switch (action) {
                 case "TABLE_UPDATE":
-                    // Cập nhật thông tin player bàn (name/avatar/balance)
                     JsonArray arr = obj.getAsJsonArray("players");
                     playersInRoom.clear();
                     for (int i = 0; i < arr.size(); i++) {
@@ -317,7 +511,6 @@ public class GameTableOnlineScene implements MessageListener {
                         p.put("balance", playerObj.get("balance").getAsDouble());
                         playersInRoom.add(p);
 
-                        // Update UI cho từng góc
                         playerNameLabels[i].setText("Tên: " + p.get("name"));
                         playerBalanceLabels[i].setText("Số dư: " + p.get("balance"));
                         String imgPath = "/avatars/avatar" + p.get("avatar") + ".jpg";
@@ -333,11 +526,9 @@ public class GameTableOnlineScene implements MessageListener {
                     break;
 
                 case "DICE_RESULT":
-                    // Hiệu ứng lắc xúc xắc và âm thanh
-                    int shakeTimes = 25; // lắc 25 lần
+                    int shakeTimes = 25;
                     Random rand = new Random();
 
-                    // Lưu dice thật để show sau hiệu ứng lắc
                     JsonArray diceArr = obj.getAsJsonArray("dice");
                     int[] finalDice = new int[diceArr.size()];
                     for (int i = 0; i < diceArr.size(); i++) {
@@ -360,6 +551,7 @@ public class GameTableOnlineScene implements MessageListener {
                                 })
                         );
                     }
+
                     timeline.getKeyFrames().add(
                             new KeyFrame(Duration.millis(shakeTimes * 50), ev -> {
                                 diceBox.getChildren().clear();
@@ -368,30 +560,32 @@ public class GameTableOnlineScene implements MessageListener {
                                     diceBox.getChildren().add(diceImg);
                                 }
 
-                                // Hiệu ứng Glow cho các symbol trúng
+                                // Hiệu ứng Glow mạnh hơn cho các symbol trúng
                                 for (int d : finalDice) {
-                                    symbolsImageViews[d].setEffect(new javafx.scene.effect.Glow(1));
-                                    Timeline t = new Timeline(
-                                            new KeyFrame(Duration.seconds(1.5), ev2 -> symbolsImageViews[d].setEffect(null))
+                                    Glow glow = new Glow(1.0);
+                                    DropShadow winGlow = new DropShadow(20, Color.web("#FFD700", 0.9));
+                                    winGlow.setInput(glow);
+                                    symbolsImageViews[d].setEffect(winGlow);
+
+                                    Timeline glowTimeline = new Timeline(
+                                            new KeyFrame(Duration.seconds(2.5), ev2 -> symbolsImageViews[d].setEffect(null))
                                     );
-                                    t.play();
+                                    glowTimeline.play();
                                 }
 
-                                // Âm thanh win/lose (tính theo client)
                                 resultLabel.setText(obj.get("resultText").getAsString());
-
                                 JsonArray newBalances = obj.getAsJsonArray("balances");
-                                double newBalance = newBalances.get(0).getAsDouble(); // (hoặc tìm đúng vị trí user)
+                                double newBalance = newBalances.get(0).getAsDouble();
+
                                 if (newBalance > user.getBalance()) {
                                     winSound.play();
                                 } else {
                                     loseSound.play();
                                 }
-                                user.setBalance((int)newBalance); // update balance object User nếu muốn
 
+                                user.setBalance((int)newBalance);
                                 for (int i = 0; i < newBalances.size(); i++) {
                                     playerBalanceLabels[i].setText("Số dư: " + newBalances.get(i).getAsDouble());
-
                                 }
 
                                 for (TextField f : betFields) f.setText("0");
@@ -406,11 +600,9 @@ public class GameTableOnlineScene implements MessageListener {
                     break;
             }
         } else {
-            // Nếu không phải JSON object, log ra cảnh báo để dễ debug khi dev, không crash app
             System.err.println("Message KHÔNG PHẢI JSON object: [" + message + "]");
         }
     }
-
 
     private void showAlert(String msg) {
         Alert alert = new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK);
