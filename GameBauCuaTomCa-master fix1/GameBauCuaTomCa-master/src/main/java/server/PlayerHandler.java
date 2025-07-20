@@ -42,6 +42,18 @@ public class PlayerHandler implements Runnable {
     public double getBalance() { return balance; }
     public void addBalance(double amount) { this.balance += amount; }
 
+    public void kickAndClose(String message) {
+        try {
+            if (message != null && out != null) {
+                out.println(message);
+            }
+            socket.close();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+
     @Override
     public void run() {
         try {
@@ -90,7 +102,17 @@ public class PlayerHandler implements Runnable {
                         setRoom(null); // Dùng hàm setRoom
                         System.out.println("[INFO] Player " + this.userId + " has left the table.");
                     }
+                }else if (action.equals("ROLL_DICE")) {
+                    // Chỉ dealer mới được phép lắc xúc xắc!
+                    if (currentRoom != null && currentRoom.getDealer() == this) {
+                        currentRoom.runGameAndBroadcast();
+                        // Nếu muốn, xóa cược sau khi lắc
+                        currentRoom.clearBets(); // Viết hàm này để reset bets nếu cần
+                    }
                 }
+
+
+
 
 
 
@@ -104,5 +126,6 @@ public class PlayerHandler implements Runnable {
             if (currentRoom != null) currentRoom.removePlayerByUserId(this.userId);
             currentRoom = null;
         }
+
     }
 }

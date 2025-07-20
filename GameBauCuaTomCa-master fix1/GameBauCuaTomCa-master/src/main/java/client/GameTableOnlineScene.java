@@ -27,11 +27,14 @@ import javafx.scene.effect.Glow;
 import static java.lang.System.out;
 
 public class GameTableOnlineScene implements MessageListener {
+
+    private Stage mainStage;
     private final String[] symbolNames = {"Nai", "Bầu", "Gà", "Cá", "Cua", "Tôm"};
     private final String[] symbolImg = {
             "/symbols/nai.png", "/symbols/bau.png", "/symbols/ga.png",
             "/symbols/ca.png", "/symbols/cua.png", "/symbols/tom.png"
     };
+
     private User user;
     private GameClientConnection connection;
     private int[] betAmount = new int[6];
@@ -48,6 +51,12 @@ public class GameTableOnlineScene implements MessageListener {
     private HBox diceBox = new HBox(15);
     private Label resultLabel = new Label();
     private List<Map<String, Object>> playersInRoom = new ArrayList<>();
+    private Label dealerLabel = new Label();
+    private Button betBtn; // Để thao tác dễ hơn
+    private boolean isDealer = false; // Lưu trạng thái mình có phải dealer không
+
+
+
 
     public GameTableOnlineScene(User user) {
         this.user = user;
@@ -80,6 +89,7 @@ public class GameTableOnlineScene implements MessageListener {
     }
 
     public void start(Stage stage) {
+        this.mainStage = stage;
         try {
             connection = new GameClientConnection("localhost", 8888, this);
         } catch (IOException e) {
@@ -232,8 +242,9 @@ public class GameTableOnlineScene implements MessageListener {
             symbolsGrid.add(symbolCol, col, row);
         }
 
-        Button betBtn = createStyledButton("🎯 ĐẶT CƯỢC", "#e74c3c", "#c0392b", 160, 40);
+        betBtn = createStyledButton("🎯 ĐẶT CƯỢC", "#e74c3c", "#c0392b", 160, 40);
         betBtn.setOnAction(e -> sendBetToServer());
+
 
         resultLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 12px 18px; -fx-background-color: rgba(0,0,0,0.6); -fx-background-radius: 18px; -fx-border-color: rgba(255,255,255,0.3); -fx-border-width: 1px; -fx-border-radius: 18px;");
 
@@ -259,7 +270,12 @@ public class GameTableOnlineScene implements MessageListener {
             ProfileScene.showProfile(stage, user);
         });
 
-        VBox centerBox = new VBox(8, gameTitle, symbolsGrid, betBtn, diceBox, resultLabel, exitBtn);
+        VBox centerBox = new VBox(8, gameTitle, dealerLabel, symbolsGrid, betBtn, diceBox, resultLabel, exitBtn);
+
+        // thêm xì tai cho glow cho dealerLabel =))))
+        dealerLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #FFD700; -fx-padding: 10px;");
+        dealerLabel.setAlignment(Pos.CENTER);
+
         centerBox.setAlignment(Pos.CENTER);
         centerBox.setPadding(new Insets(15));
 
@@ -294,6 +310,7 @@ public class GameTableOnlineScene implements MessageListener {
         sendJoinTable();
         backSound.play();
     }
+
 
     private Button createStyledButton(String text, String color1, String color2, double width, double height) {
         Button button = new Button(text);
@@ -492,6 +509,8 @@ public class GameTableOnlineScene implements MessageListener {
         Platform.runLater(() -> showAlert("Bạn đã thoát khỏi bàn thành công"));
     }
 
+
+
     private void handleServerMessage(String message) {
         out.println("Message from server: [" + message + "]");
 
@@ -503,27 +522,83 @@ public class GameTableOnlineScene implements MessageListener {
                 case "TABLE_UPDATE":
                     JsonArray arr = obj.getAsJsonArray("players");
                     playersInRoom.clear();
+
+                    // Đọc dealerId và dealerName từ server
+                    int dealerId = obj.has("dealerId") ? obj.get("dealerId").getAsInt() : -1;
+                    String dealerName = obj.has("dealerName") ? obj.get("dealerName").getAsString() : "";
+
                     for (int i = 0; i < arr.size(); i++) {
                         JsonObject playerObj = arr.get(i).getAsJsonObject();
                         Map<String, Object> p = new HashMap<>();
                         p.put("name", playerObj.get("name").getAsString());
                         p.put("avatar", playerObj.get("avatar").getAsInt());
                         p.put("balance", playerObj.get("balance").getAsDouble());
+                        int thisPlayerId = playerObj.has("userId") ? playerObj.get("userId").getAsInt() : -1;
+                        p.put("userId", thisPlayerId);
                         playersInRoom.add(p);
 
-                        playerNameLabels[i].setText("Tên: " + p.get("name"));
-                        playerBalanceLabels[i].setText("Số dư: " + p.get("balance"));
+                        // Hiển thị rõ người làm cái trên UI
+                        if (thisPlayerId == dealerId) {
+                            playerNameLabels[i].setText("Tên: " + p.get("name") + " (CÁI)");
+                            playerNameLabels[i].setTextFill(Color.web("#FFD700"));
+                            playerAvatarViews[i].setEffect(new DropShadow(22, Color.web("#FFD700", 0.8)));
+                        } else {
+                            playerNameLabels[i].setText("Tên: " + p.get("name"));
+                            playerNameLabels[i].setTextFill(Color.WHITE);
+                            playerAvatarViews[i].setEffect(null);
+                        }
                         String imgPath = "/avatars/avatar" + p.get("avatar") + ".jpg";
                         InputStream is = getClass().getResourceAsStream(imgPath);
                         if (is == null) imgPath = "/avatars/default.jpg";
                         playerAvatarViews[i].setImage(new Image(getClass().getResourceAsStream(imgPath), 48, 48, true, true));
+                        playerBalanceLabels[i].setText("Số dư: " + p.get("balance"));
                     }
                     for (int i = arr.size(); i < 4; i++) {
                         playerNameLabels[i].setText("Chờ người chơi vào bàn...");
+                        playerNameLabels[i].setTextFill(Color.WHITE);
                         playerBalanceLabels[i].setText("");
+                        playerAvatarViews[i].setEffect(null);
                         playerAvatarViews[i].setImage(null);
                     }
+
+                    // Cập nhật label dealer nổi bật
+                    if (dealerId == user.getId()) {
+                        dealerLabel.setText("🌟 Bạn đang làm CÁI (Dealer) 🌟");
+                        dealerLabel.setTextFill(Color.web("#FFD700"));
+                    } else if (!dealerName.isEmpty() && dealerId != -1) {
+                        dealerLabel.setText("🃏 " + dealerName + " đang làm CÁI (Dealer)");
+                        dealerLabel.setTextFill(Color.web("#FFD700"));
+                    } else {
+                        dealerLabel.setText("Chưa có ai làm cái");
+                        dealerLabel.setTextFill(Color.WHITE);
+                    }
+
+                    if (dealerId == user.getId()) {
+                        for (TextField f : betFields) f.setDisable(true); // Dealer không được đặt cược
+                    } else {
+                        for (TextField f : betFields) f.setDisable(false); // Các con được đặt cược bình thường
+                    }
+
+                    isDealer = (dealerId == user.getId());
+                    if (isDealer) {
+                        betBtn.setText("🎲 LẮC XÚC XẮC");
+                        betBtn.setDisable(false); // dealer luôn được bấm nút này
+                        betBtn.setOnAction(ev -> {
+                            JsonObject msg = new JsonObject();
+                            msg.addProperty("action", "ROLL_DICE");
+                            connection.send(msg.toString());
+                        });
+                        // Disable đặt cược
+                        for (TextField f : betFields) f.setDisable(true);
+                    } else {
+                        betBtn.setText("🎯 ĐẶT CƯỢC");
+                        betBtn.setOnAction(ev -> sendBetToServer());
+                        // Con chỉ được đặt cược nếu chưa gửi cược
+                        for (TextField f : betFields) f.setDisable(false);
+                    }
+
                     break;
+
 
                 case "DICE_RESULT":
                     int shakeTimes = 25;
@@ -598,11 +673,70 @@ public class GameTableOnlineScene implements MessageListener {
                 case "ERROR":
                     showAlert(obj.get("message").getAsString());
                     break;
+
+                case "KICKED":
+                    String reason = obj.has("message") ? obj.get("message").getAsString() : "Bạn đã bị đá khỏi bàn!";
+                    double kickedBalance = obj.has("balance") ? obj.get("balance").getAsDouble() : user.getBalance();
+                    
+                    // Cập nhật balance của user
+                    user.setBalance((int)kickedBalance);
+                    
+                    // Hiển thị thông báo kick với hiệu ứng
+                    Label kickLabel = new Label(reason);
+                    kickLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #FF6B6B; -fx-background-color: rgba(0,0,0,0.8); -fx-padding: 20px; -fx-background-radius: 10px;");
+                    kickLabel.setAlignment(Pos.CENTER);
+                    kickLabel.setMinWidth(400);
+                    kickLabel.setMaxWidth(400);
+                    
+                    StackPane kickPane = new StackPane(kickLabel);
+                    kickPane.setAlignment(Pos.CENTER);
+                    
+                    // Thêm hiệu ứng vào scene
+                    if (mainStage.getScene().getRoot() instanceof StackPane) {
+                        StackPane root = (StackPane) mainStage.getScene().getRoot();
+                        root.getChildren().add(kickPane);
+                    }
+                    
+                    // Animation cho thông báo
+                    FadeTransition fadeIn = new FadeTransition(Duration.millis(500), kickLabel);
+                    fadeIn.setFromValue(0);
+                    fadeIn.setToValue(1);
+                    
+                    ScaleTransition scaleUp = new ScaleTransition(Duration.millis(500), kickLabel);
+                    scaleUp.setFromX(0.5);
+                    scaleUp.setFromY(0.5);
+                    scaleUp.setToX(1.0);
+                    scaleUp.setToY(1.0);
+                    
+                    ParallelTransition showKick = new ParallelTransition(fadeIn, scaleUp);
+                    
+                    // Sau khi hiển thị thông báo, delay rồi chuyển về profile
+                    showKick.setOnFinished(e -> {
+                        // Ngắt kết nối sau khi hoàn thành animation
+                        PauseTransition delay = new PauseTransition(Duration.seconds(2));
+                        delay.setOnFinished(ev -> {
+                            connection.disconnect();
+                            showProfileAndAlert(reason);
+                        });
+                        delay.play();
+                    });
+                    
+                    showKick.play();
+                    break;
+
             }
         } else {
             System.err.println("Message KHÔNG PHẢI JSON object: [" + message + "]");
         }
     }
+
+    private void showProfileAndAlert(String msg) {
+        ProfileScene.showProfile(mainStage, user);
+        Alert alert = new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK);
+        alert.showAndWait();
+    }
+
+
 
     private void showAlert(String msg) {
         Alert alert = new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK);

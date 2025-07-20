@@ -6,6 +6,7 @@ import db.UserDAO;
 import java.util.*;
 
 public class GameRoom {
+    private PlayerHandler dealer;
     private static final int MAX_PLAYER = 4;
     private final List<PlayerHandler> players = new ArrayList<>();
     private Map<PlayerHandler, int[]> bets = new HashMap<>();
@@ -17,11 +18,18 @@ public class GameRoom {
     } */
 
     public synchronized void addPlayer(PlayerHandler p) {
-        removePlayerByUserId(p.getUserId()); // Xóa hết bản cũ trùng userId trước CON CAC
+        removePlayerByUserId(p.getUserId()); // Xoá player cũ nếu trùng userId
         players.add(p);
+
+        // Nếu chưa có dealer, người mới vào sẽ làm dealer
+        if (dealer == null) {
+            dealer = p;
+        }
+
         System.out.println("[ADD] " + p.getPlayerName() + " - userId: " + p.getUserId() + " | Số người: " + players.size());
         broadcastTableUpdate();
     }
+
 
 
 
@@ -32,12 +40,25 @@ public class GameRoom {
         while (it.hasNext()) {
             PlayerHandler p = it.next();
             if (p.getUserId() == userId) {
-                it.remove();
-                bets.remove(p);
+                // Nếu dealer rời bàn
+                if (dealer == p) {
+                    it.remove();
+                    bets.remove(p);
+                    // Gán dealer mới: người còn lại đầu tiên (nếu còn), hoặc null nếu bàn trống
+                    dealer = players.isEmpty() ? null : players.get(0);
+                    broadcastTableUpdate();
+                    return;
+                } else {
+                    it.remove();
+                    bets.remove(p);
+                    broadcastTableUpdate();
+                    return;
+                }
             }
         }
         broadcastTableUpdate();
     }
+
 
 
 
@@ -67,6 +88,7 @@ public class GameRoom {
         JsonArray arr = new JsonArray();
         for (PlayerHandler p : players) {
             JsonObject pJson = new JsonObject();
+            pJson.addProperty("userId", p.getUserId());
             pJson.addProperty("name", p.getPlayerName());
             pJson.addProperty("avatar", p.getAvatarNum());
             pJson.addProperty("balance", p.getBalance());
@@ -74,48 +96,86 @@ public class GameRoom {
         }
         msg.add("players", arr);
 
+        // Thêm dealer info
+        if (dealer != null) {
+            msg.addProperty("dealerId", dealer.getUserId());
+            msg.addProperty("dealerName", dealer.getPlayerName());
+        } else {
+            msg.addProperty("dealerId", -1);
+            msg.addProperty("dealerName", "");
+        }
+
         String jsonString = msg.toString();
         for (PlayerHandler p : players) {
             p.send(jsonString);
         }
     }
 
+
     // 6. GỬI DICE_RESULT
-    private void runGameAndBroadcast() {
+    public void runGameAndBroadcast() {
         Random rand = new Random();
         int[] dice = {rand.nextInt(6), rand.nextInt(6), rand.nextInt(6)};
+        int[] diceCount = new int[6];
+        for (int d : dice) diceCount[d]++;
+
+        PlayerHandler dealer = this.dealer;
+        double dealerDelta = 0;
 
         List<Double> balancesAfter = new ArrayList<>();
+        balancesAfter.add(dealer.getBalance()); // placeholder
 
+        // Danh sách lưu người chơi cần kick (không phải dealer)
+        List<PlayerHandler> kickedPlayers = new ArrayList<>();
 
         for (PlayerHandler p : players) {
+            if (p == dealer) continue;
+
             int[] bet = bets.getOrDefault(p, new int[6]);
-            double win = 0;
-
-            int[] diceCount = new int[6];
-            for (int d : dice) diceCount[d]++;
-
-
+            double playerDelta = 0;
 
             for (int i = 0; i < 6; i++) {
-                int count = 0;
-                for (int d : dice) if (d == i) count++;
-                if (bet[i] > 0 && count > 0) {
-                    win += bet[i] * count; // lời
-                    win += bet[i];
+                if (bet[i] > 0) {
+                    int count = diceCount[i];
+                    if (count > 0) {
+                        // Player thắng: dealer phải trả
+                        double dealerBalance = dealer.getBalance();
+                        double win = bet[i] * count + bet[i];
+                        double lose = bet[i] * count;
+
+                        if (dealerBalance >= win) {
+                            playerDelta += win;
+                            dealerDelta -= lose;
+                            dealer.addBalance(-win);
+                        } else if (dealerBalance > 0) {
+                            playerDelta += dealerBalance;
+                            dealerDelta -= dealerBalance;
+                            dealer.addBalance(-dealerBalance); // dealer về 0
+                        }
+                    } else {
+                        dealerDelta += bet[i];
+                        dealer.addBalance(bet[i]);
+                    }
                 }
             }
 
-
-            p.addBalance(win);
+            p.addBalance(playerDelta);
+            if (p.getBalance() < 0) p.addBalance(-p.getBalance());
+            UserDAO.updateBalance(p.getUserId(), (int) p.getBalance());
             balancesAfter.add(p.getBalance());
 
-
-            UserDAO.updateBalance(p.getUserId(), (int) p.getBalance());
-
-
+            // **Kick player nếu balance < 200**
+            if (p.getBalance() < 200) {
+                kickedPlayers.add(p);
+            }
         }
 
+        // Đảm bảo dealer không âm tiền
+        if (dealer.getBalance() < 0) dealer.addBalance(-dealer.getBalance());
+        UserDAO.updateBalance(dealer.getUserId(), (int) dealer.getBalance());
+        balancesAfter.set(0, dealer.getBalance());
+
+        // Gửi kết quả trước
         JsonObject msg = new JsonObject();
         msg.addProperty("action", "DICE_RESULT");
 
@@ -133,11 +193,106 @@ public class GameRoom {
         for (PlayerHandler p : players) {
             p.send(jsonString);
         }
+
+        // 1. Gửi thông báo cho người chơi còn dưới 200 và đặt hẹn giờ để kick
+        for (PlayerHandler p : kickedPlayers) {
+            // Tạo một thread riêng để delay việc kick người chơi
+            new Thread(() -> {
+                try {
+                    // Delay 5 giây để người chơi có thể xem kết quả
+                    Thread.sleep(5000);
+                    
+                    // Kiểm tra xem người chơi còn kết nối không trước khi kick
+                    if (players.contains(p)) {
+                        JsonObject kickMsg = new JsonObject();
+                        kickMsg.addProperty("action", "KICKED");
+                        kickMsg.addProperty("message", "Bạn đã bị đá khỏi bàn do số dư dưới 200!");
+                        kickMsg.addProperty("balance", p.getBalance());
+                        p.send(kickMsg.toString());
+                        
+                        // Delay thêm 1 giây để người chơi nhìn thấy thông báo
+                        Thread.sleep(1000);
+                        
+                        p.kickAndClose(null);
+                        removePlayerByUserId(p.getUserId());
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+        }
+        
+        // 2. Nếu dealer < 200 thì gửi thông báo và đặt hẹn giờ để kick dealer
+        boolean dealerKicked = false;
+        if (dealer.getBalance() < 200) {
+            dealerKicked = true;
+            
+            // Tạo bản sao final của dealer hiện tại
+            final PlayerHandler dealerToKick = dealer;
+            
+            // Tạo một thread riêng để delay việc kick dealer
+            new Thread(() -> {
+                try {
+                    // Delay 5 giây để dealer có thể xem kết quả
+                    Thread.sleep(5000);
+                    
+                    // Kiểm tra xem dealer còn kết nối không trước khi kick
+                    if (players.contains(dealerToKick)) {
+                        JsonObject kickMsg = new JsonObject();
+                        kickMsg.addProperty("action", "KICKED");
+                        kickMsg.addProperty("message", "Bạn đã bị đá khỏi bàn do làm cái mà số dư dưới 200!");
+                        kickMsg.addProperty("balance", dealerToKick.getBalance());
+                        dealerToKick.send(kickMsg.toString());
+                        
+                        // Delay thêm 1 giây để dealer nhìn thấy thông báo
+                        Thread.sleep(1000);
+                        
+                        dealerToKick.kickAndClose(null);
+                        removePlayerByUserId(dealerToKick.getUserId());
+                        
+                        // Chọn dealer mới nếu còn player khác
+                        synchronized (GameRoom.this) {
+                            if (!players.isEmpty()) {
+                                GameRoom.this.dealer = players.get(0);
+                                broadcastTableUpdate();
+                            }
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+        }
+
+
+        // Không xử lý chọn dealer mới ở đây vì đã được xử lý trong thread delay
+        // Broadcast table update để cập nhật UI cho tất cả player còn lại
+        broadcastTableUpdate();
+        
     }
+
+
+
+
+
+
 
     // Trả chuỗi kết quả xúc xắc để client hiện lên
     private String makeResultText(int[] dice) {
         String[] symbolNames = {"Nai", "Bầu", "Gà", "Cá", "Cua", "Tôm"};
         return "Kết quả: " + symbolNames[dice[0]] + ", " + symbolNames[dice[1]] + ", " + symbolNames[dice[2]];
     }
+
+    public synchronized void clearBets() {
+        bets.clear();
+    }
+
+    public PlayerHandler getDealer() {
+        return dealer;
+    }
+
+    public synchronized boolean isPlayerInRoom(PlayerHandler player) {
+        return players.contains(player);
+    }
+
 }
