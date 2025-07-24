@@ -54,6 +54,8 @@ public class GameTableOnlineScene implements MessageListener {
     private Label dealerLabel = new Label();
     private Button betBtn; // Để thao tác dễ hơn
     private boolean isDealer = false; // Lưu trạng thái mình có phải dealer không
+    private boolean isMusicPlaying = true; // Lưu trạng thái nhạc nền đang chạy hay không
+    private Button musicToggleBtn; // Nút bật/tắt nhạc nền
 
 
 
@@ -245,6 +247,9 @@ public class GameTableOnlineScene implements MessageListener {
         betBtn = createStyledButton("🎯 ĐẶT CƯỢC", "#e74c3c", "#c0392b", 160, 40);
         betBtn.setOnAction(e -> sendBetToServer());
 
+        // Tạo nút bật/tắt nhạc nền
+        musicToggleBtn = createStyledButton("🔊 Nhạc: Bật", "#3498db", "#2980b9", 160, 40);
+        musicToggleBtn.setOnAction(e -> toggleBackgroundMusic());
 
         resultLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 12px 18px; -fx-background-color: rgba(0,0,0,0.6); -fx-background-radius: 18px; -fx-border-color: rgba(255,255,255,0.3); -fx-border-width: 1px; -fx-border-radius: 18px;");
 
@@ -270,7 +275,11 @@ public class GameTableOnlineScene implements MessageListener {
             ProfileScene.showProfile(stage, user);
         });
 
-        VBox centerBox = new VBox(8, gameTitle, dealerLabel, symbolsGrid, betBtn, diceBox, resultLabel, exitBtn);
+        // Tạo HBox chứa nút thoát và nút âm nhạc
+        HBox buttonsBox = new HBox(15, exitBtn, musicToggleBtn);
+        buttonsBox.setAlignment(Pos.CENTER);
+
+        VBox centerBox = new VBox(8, gameTitle, dealerLabel, symbolsGrid, betBtn, diceBox, resultLabel, buttonsBox);
 
         // thêm xì tai cho glow cho dealerLabel =))))
         dealerLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #FFD700; -fx-padding: 10px;");
@@ -736,6 +745,22 @@ public class GameTableOnlineScene implements MessageListener {
         alert.showAndWait();
     }
 
+    /**
+     * Bật/tắt nhạc nền và cập nhật trạng thái nút
+     */
+    private void toggleBackgroundMusic() {
+        isMusicPlaying = !isMusicPlaying;
+
+        if (isMusicPlaying) {
+            backSound.play();
+            musicToggleBtn.setText("🔊 Nhạc: Bật");
+            musicToggleBtn.setStyle("-fx-background-color: linear-gradient(to right, #3498db, #2980b9); -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-background-radius: 22px; -fx-cursor: hand; -fx-border-color: rgba(255,255,255,0.4); -fx-border-width: 1px; -fx-border-radius: 22px;");
+        } else {
+            backSound.stop();
+            musicToggleBtn.setText("🔇 Nhạc: Tắt");
+            musicToggleBtn.setStyle("-fx-background-color: linear-gradient(to right, #95a5a6, #7f8c8d); -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-background-radius: 22px; -fx-cursor: hand; -fx-border-color: rgba(255,255,255,0.4); -fx-border-width: 1px; -fx-border-radius: 22px;");
+        }
+    }
 
 
     private void showAlert(String msg) {

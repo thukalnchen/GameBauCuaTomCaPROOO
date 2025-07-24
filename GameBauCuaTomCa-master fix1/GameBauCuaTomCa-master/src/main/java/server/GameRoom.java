@@ -125,8 +125,8 @@ public class GameRoom {
         List<Double> balancesAfter = new ArrayList<>();
         balancesAfter.add(dealer.getBalance()); // placeholder
 
-        // Danh sách lưu người chơi cần kick (không phải dealer)
-        List<PlayerHandler> kickedPlayers = new ArrayList<>();
+
+        List<PlayerHandler> kickedPlayers = new ArrayList<>();         // Danh sách lưu người chơi cần kick (không phải dealer)
 
         for (PlayerHandler p : players) {
             if (p == dealer) continue;
@@ -134,21 +134,21 @@ public class GameRoom {
             int[] bet = bets.getOrDefault(p, new int[6]);
             double playerDelta = 0;
 
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < 6; i++) {   // Xử Lí logic thắng thua tiền cược ở đây nè :VVV
                 if (bet[i] > 0) {
                     int count = diceCount[i];
                     if (count > 0) {
                         // Player thắng: dealer phải trả
                         double dealerBalance = dealer.getBalance();
                         double win = bet[i] * count + bet[i];
-                        double lose = bet[i] * count;
+                        double lose_nhacai = bet[i] * count;
 
-                        if (dealerBalance >= win) {
+                        if (dealerBalance >= lose_nhacai) {
                             playerDelta += win;
-                            dealerDelta -= lose;
-                            dealer.addBalance(-win);
+                            dealerDelta -= lose_nhacai;
+                            dealer.addBalance(-lose_nhacai);
                         } else if (dealerBalance > 0) {
-                            playerDelta += dealerBalance;
+                            playerDelta += dealerBalance + bet[i]; // Trả lại tiền cược + số tiền dealer có thể trả
                             dealerDelta -= dealerBalance;
                             dealer.addBalance(-dealerBalance); // dealer về 0
                         }

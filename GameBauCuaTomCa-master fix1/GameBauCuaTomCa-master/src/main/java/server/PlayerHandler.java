@@ -100,7 +100,7 @@ public class PlayerHandler implements Runnable {
                     if (currentRoom != null) {
                         currentRoom.removePlayerByUserId(this.userId);
                         setRoom(null); // Dùng hàm setRoom
-                        System.out.println("[INFO] Player " + this.userId + " has left the table.");
+                        System.out.println("[INFO] Player " + this.userId + " Da roi khoi ban.");
                     }
                 }else if (action.equals("ROLL_DICE")) {
                     // Chỉ dealer mới được phép lắc xúc xắc!
