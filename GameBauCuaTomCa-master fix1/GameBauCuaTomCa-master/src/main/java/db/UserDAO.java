@@ -1,6 +1,9 @@
 package db;
+import common.NapTienLog;
 import common.User;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserDAO {
 
@@ -82,4 +85,57 @@ public class UserDAO {
         }
         return false;
     }
+    public static boolean logNapTien(int userId, double amount, String paymentId, String payerId, Timestamp createdAt) {
+        String sql = "INSERT INTO nap_tien_log (user_id, amount, payment_id, payer_id, created_at) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = DBConnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setDouble(2, amount);
+            ps.setString(3, paymentId);
+            ps.setString(4, payerId);
+            ps.setTimestamp(5, createdAt);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+
+
+    public static List<NapTienLog> getLichSuNapTien(int userId) {
+        List<NapTienLog> lichSu = new ArrayList<>();
+        String sql = "SELECT * FROM nap_tien_log WHERE user_id = ? ORDER BY created_at DESC";
+
+        try (Connection conn = DBConnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, userId);
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                NapTienLog log = new NapTienLog(
+                        rs.getInt("id"),
+                        rs.getInt("user_id"),
+                        rs.getInt("amount"),
+                        rs.getString("payment_id"),
+                        rs.getString("payer_id"),
+                        rs.getTimestamp("created_at")
+                );
+                lichSu.add(log);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return lichSu;
+    }
+
+
+
+
+
+
+
 }

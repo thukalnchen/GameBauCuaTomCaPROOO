@@ -13,10 +13,18 @@ module com.baucua.baucuatomca {
     requires java.sql;
     requires javafx.media;
     requires com.google.gson;
+    requires rest.api.sdk;
+    requires java.desktop;
+    requires spark.core;
+    requires jdk.httpserver;
+
 
     opens com.baucua.baucuatomca to javafx.fxml;
-    exports com.baucua.baucuatomca;
+
 
     // Add client package to module exports
     exports client;
+    exports payment;
+
+    exports server;
 }

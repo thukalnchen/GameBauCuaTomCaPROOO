@@ -18,7 +18,9 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.effect.*;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import server.WebServer;
 
+import java.io.IOException;
 import java.util.Random;
 
 public class LoginScene extends Application {
@@ -222,7 +224,16 @@ public class LoginScene extends Application {
                                 // Dừng animations trước khi chuyển scene
                                 if (backgroundAnimation != null) backgroundAnimation.stop();
                                 if (particleAnimation != null) particleAnimation.stop();
+                                // Khởi động WebServer với user sau khi login thành công
+                                try {
+                                    WebServer.start(user);
+                                } catch (IOException ex) {
+                                    throw new RuntimeException(ex);
+                                }
+
+                                // Sau đó chuyển sang profile
                                 ProfileScene.showProfile(stage, user);
+
                             });
                         } else {
                             showMessage(result, "❌ Đăng nhập thất bại! Kiểm tra lại thông tin.", "#e74c3c");

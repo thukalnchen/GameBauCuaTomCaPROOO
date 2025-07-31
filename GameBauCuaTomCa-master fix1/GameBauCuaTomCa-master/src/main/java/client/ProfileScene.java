@@ -26,6 +26,12 @@ import javafx.scene.control.ScrollPane;
 import java.io.InputStream;
 import java.util.Random;
 
+import payment.PayPalService;
+import com.paypal.base.rest.PayPalRESTException;
+import java.awt.Desktop;
+import java.net.URI;
+
+
 public class ProfileScene {
     private static Timeline backgroundAnimation;
     private static Timeline particleAnimation;
@@ -160,6 +166,20 @@ public class ProfileScene {
         Button watchAd = createNeonButton("🎬 Xem quảng cáo", "#feca57", "#ff9f1a");
         Button createTable = createNeonButton("🎲 Tạo bàn", "#feca57", "#fd9644");
         Button logout = createNeonButton("🚪 Đăng xuất", "#ff9ff3", "#f368e0");
+        Button Naptien=createNeonButton("💰 Nạp tiền", "#4ecdc4", "#45b7aa");
+        Button LichSuNapTien=createNeonButton("💰Lịch sử nạp tiền", "#4ecdc4", "#45b7aa");
+
+        LichSuNapTien.setOnAction(e->{
+            new LichSuNapTienView().start(user,stage);
+        });
+
+
+        Naptien.setOnAction(e->{
+            new NapTienScene().start(stage);
+        });
+
+
+
 
         watchAd.setOnAction(e -> {
             AdRewardScene.showAd(stage, user, () -> {
@@ -220,7 +240,7 @@ public class ProfileScene {
         Region spacer = new Region();
         spacer.setPrefHeight(20);
 
-        VBox content = new VBox(20, title, avatarContainer, infoBox, gameButtons, settingButtons, spacer, logout);
+        VBox content = new VBox(20, title, avatarContainer, infoBox, gameButtons, settingButtons, spacer,Naptien,LichSuNapTien, logout);
         content.setAlignment(Pos.CENTER);
         content.setPadding(new Insets(30));
 

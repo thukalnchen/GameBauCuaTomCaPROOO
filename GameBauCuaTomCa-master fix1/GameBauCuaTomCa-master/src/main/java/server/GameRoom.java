@@ -112,7 +112,7 @@ public class GameRoom {
     }
 
 
-    // 6. GỬI DICE_RESULT
+    // 6. GỬI DICE_RESULT  ( KET QUA XUC SAC)
     public void runGameAndBroadcast() {
         Random rand = new Random();
         int[] dice = {rand.nextInt(6), rand.nextInt(6), rand.nextInt(6)};
